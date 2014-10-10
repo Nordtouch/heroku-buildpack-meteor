@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# bin/detect <build-dir>
+
+if [ -d "$1/meteor/.meteor" ]; then
+	echo "Found Meteor app" && exit 0
+else
+	echo "Meteor app missing" && exit 1
+fi

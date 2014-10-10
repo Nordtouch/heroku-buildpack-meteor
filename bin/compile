@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# bin/compile <build-dir> <cache-dir>
+
+set -e
+set -o pipefail
+
+BUILD_DIR=$1
+METEOR_APP=$1/meteor
+CACHE_DIR=$1
+BP_DIR=$(cd $(dirname $0); cd ..; pwd)
+
+VENDOR_DIR=$BUILD_DIR/vendor
+NODE_DIR=$VENDOR_DIR/node
+METEOR_DIR=$VENDOR_DIR/meteor
+
+unset GIT_DIR
+
+source $BP_DIR/bin/common.sh
+
+function clean() {
+	rm -rf $VENDOR_DIR
+}
+
+function install_node() {
+	status "Installing node"
+	semver_range="^0.10"
+	node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
+	node_url="http://s3pository.heroku.com/node/v$node_version/node-v$node_version-linux-x64.tar.gz"
+	curl $node_url -s -o - | tar xzf - -C $BUILD_DIR
+	mkdir -p $BUILD_DIR/vendor
+	mv $BUILD_DIR/node-v$node_version-linux-x64 $NODE_DIR
+	chmod +x $NODE_DIR/bin/*
+	PATH=$NODE_DIR/bin:$PATH
+}
+
+function install_meteor() {
+	status "Installing meteor"
+	temp_install=`mktempdir meteor`
+	curl https://install.meteor.com | HOME="$temp_install" /bin/sh
+	mkdir -p $METEOR_DIR
+	mv $temp_install/.meteor/* $METEOR_DIR
+	rm -rf $temp_install
+	PATH=$METEOR_DIR:$PATH
+}
+
+function build_app() {
+	cd $METEOR_APP
+	status "Updating Meteor packages"
+	meteor update
+	status "Building Meteor app"
+	meteor build --directory $BUILD_DIR
+	cd $BUILD_DIR/bundle/programs/server
+	status "Installing npm packages"
+	npm install
+}
+
+function update_env() {
+	status "Updating runtime environment"
+	mkdir -p $BUILD_DIR/.profile.d
+	cat > $BUILD_DIR/.profile.d/meteor.sh <<"EOF"
+#!/bin/sh
+export PATH=$HOME/vendor/node/bin:$HOME/vendor/meteor:$PATH
+EOF
+}
+
+status "Started compile"
+clean
+install_node
+install_meteor
+build_app
+update_env
