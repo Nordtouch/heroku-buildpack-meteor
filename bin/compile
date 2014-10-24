@@ -60,6 +60,7 @@ function update_env() {
 	cat > $BUILD_DIR/.profile.d/meteor.sh <<"EOF"
 #!/bin/sh
 export PATH=$HOME/vendor/node/bin:$HOME/vendor/meteor:$PATH
+export METEOR_SETTINGS=$HOME/meteor/settings.json
 EOF
 }
 
